@@ -308,6 +308,24 @@ button:focus, input:focus { outline: 2px solid var(--sun); outline-offset: 2px; 
 .dialog .section { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); }
 .dialog .section .hint { margin: 0 0 12px; }
 .dialog code { color: var(--text); font-size: 14px; word-break: break-all; -webkit-user-select: text; user-select: text; }
+.dialog a { color: var(--sun); }
+.dialog .steps { margin: 0 0 12px; padding-left: 22px; }
+.dialog .steps li { margin-bottom: 6px; }
+.dialog textarea {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--ink);
+  color: var(--text);
+  font-family: Menlo, Consolas, monospace;
+  font-size: 16px;
+  word-break: break-all;
+  -webkit-appearance: none;
+}
 .row { display: flex; }
 .row input {
   flex: 1 1 auto;
@@ -491,15 +509,45 @@ button:focus, input:focus { outline: 2px solid var(--sun); outline-offset: 2px; 
     <label class="check" for="optSeconds"><input type="checkbox" id="optSeconds">Показывать секунды</label>
 
     <p class="hint">Ночью можно коснуться экрана, и он станет ярким на 2 минуты.</p>
-    <p class="hint">Чтобы панель открывалась без адресной строки: в Safari нажмите «Поделиться» → «На экран „Домой“» и запускайте её с этого значка. Вход в Spotify нужно выполнить уже оттуда: значок и Safari хранят данные раздельно.</p>
+    <p class="hint">Чтобы панель открывалась без адресной строки: в Safari нажмите «Поделиться» → «На экран „Домой“» и запускайте её с этого значка.</p>
 
     <div class="section">
       <p class="field">Spotify</p>
       <p class="hint" id="spSetStatus"></p>
       <button type="button" class="btn" id="spSetLogin" hidden>Войти в Spotify</button>
+
+      <div id="spPairIn" hidden>
+        <p class="hint">Со значка войти нельзя: он хранит данные отдельно от Safari. Поэтому вход выполняется в Safari и переносится сюда кодом:</p>
+        <ol class="hint steps">
+          <li>Откройте <a id="spSafariLink" target="_blank" rel="noopener">панель в Safari</a> и войдите там в Spotify.</li>
+          <li>В Safari откройте «Настройки» панели и нажмите «Передать вход на значок».</li>
+          <li>Вернитесь сюда, вставьте код в поле ниже и нажмите «Подключить».</li>
+        </ol>
+        <form id="spPairForm">
+          <div class="row">
+            <input id="spPairCode" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Код входа" aria-label="Код входа">
+            <button type="submit" class="btn">Подключить</button>
+          </div>
+        </form>
+        <p class="hint" id="spPairStatus"></p>
+      </div>
+
+      <div id="spPairOut" hidden>
+        <p class="hint">Пользуетесь панелью со значка на экране «Домой»? Передайте ему вход. Здесь, в Safari, вход при этом закончится.</p>
+        <button type="button" class="btn quiet" id="spHandoff">Передать вход на значок</button>
+      </div>
+
+      <div id="spCodeBox" hidden>
+        <p class="hint" id="spCodeStatus"></p>
+        <textarea id="spCode" rows="4" aria-label="Код входа"></textarea>
+        <button type="button" class="btn quiet" id="spCopyCode">Скопировать ещё раз</button>
+      </div>
+
       <button type="button" class="btn quiet" id="spLogout" hidden>Выйти из Spotify</button>
-      <p class="hint" id="spRedirectRow">Адрес возврата для кабинета разработчика Spotify: <code id="spRedirect"></code></p>
+      <p class="hint" id="spRedirectRow" hidden>Адрес возврата для кабинета разработчика Spotify: <code id="spRedirect"></code></p>
     </div>
+
+    <p class="hint">Версия панели: 2</p>
 
     <button type="button" class="btn done" id="closeSettings">Готово</button>
   </div>
@@ -904,6 +952,9 @@ button:focus, input:focus { outline: 2px solid var(--sun); outline-offset: 2px; 
     $('cityResults').innerHTML = '';
     $('cityStatus').textContent = '';
     showCurrentCity();
+    $('spCode').value = '';
+    $('spCodeBox').hidden = true;
+    $('spPairStatus').textContent = '';
     renderSpotifySettings();
     overlay.hidden = false;
   }
@@ -984,6 +1035,8 @@ button:focus, input:focus { outline: 2px solid var(--sun); outline-offset: 2px; 
 
   var SPOTIFY_SCOPES = 'user-read-playback-state user-modify-playback-state';
   var PKCE_KEY = 'homePanel.pkce';
+  // Панель открыта значком с экрана «Домой». Он хранит данные отдельно от Safari, и на iPad с iOS 12 вход со значка не доходит до панели.
+  var IS_ICON = window.navigator.standalone === true;
 
   var SHA_K = [
     0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
@@ -1160,6 +1213,65 @@ button:focus, input:focus { outline: 2px solid var(--sun); outline-offset: 2px; 
     showSpotifyMsg(message || '');
   }
 
+  // ---------- Spotify: перенос входа из Safari на значок ----------
+
+  function copyLoginCode() {
+    var field = $('spCode');
+    var copied = false;
+    field.focus();
+    field.setSelectionRange(0, field.value.length);
+    try { copied = document.execCommand('copy'); } catch (e) {}
+    field.blur();
+    $('spCodeStatus').textContent = copied
+      ? 'Код скопирован. Откройте панель со значка, зайдите в «Настройки», вставьте код и нажмите «Подключить».'
+      : 'Скопировать не получилось. Выделите код ниже и скопируйте его вручную, затем вставьте в «Настройках» панели на значке.';
+  }
+
+  function handOffLogin() {
+    if (refreshWaiters) {
+      $('spSetStatus').textContent = 'Подождите пару секунд и нажмите ещё раз: панель сейчас обновляет вход.';
+      return;
+    }
+    var code = state.spotify.refreshToken;
+    // Spotify может заменить токен при обновлении, поэтому пользоваться им должна только одна копия панели
+    spotifyLogout();
+    $('spCode').value = code;
+    $('spCodeBox').hidden = false;
+    copyLoginCode();
+  }
+
+  function connectWithCode(e) {
+    e.preventDefault();
+    var input = $('spPairCode');
+    var status = $('spPairStatus');
+    var code = input.value.replace(/\s+/g, '');
+    if (!code) {
+      status.textContent = 'Сначала вставьте код из Safari.';
+      return;
+    }
+    input.blur();
+    status.textContent = 'Подключаю…';
+    tokenRequest({
+      grant_type: 'refresh_token',
+      refresh_token: code,
+      client_id: SPOTIFY_CLIENT_ID
+    }, function (tokens, http) {
+      if (!tokens) {
+        status.textContent = http === 0
+          ? 'Нет связи со Spotify. Проверьте интернет и нажмите «Подключить» ещё раз.'
+          : 'Код не подошёл. Получите новый код в Safari: войдите там в Spotify и снова нажмите «Передать вход на значок».';
+        return;
+      }
+      state.spotify = { refreshToken: code };
+      storeSpotifyTokens(tokens);
+      input.value = '';
+      status.textContent = '';
+      closeSettings();
+      renderPlayer();
+      pollPlayer();
+    });
+  }
+
   // ---------- Spotify: запросы ----------
 
   var refreshWaiters = null;
@@ -1175,7 +1287,7 @@ button:focus, input:focus { outline: 2px solid var(--sun); outline-offset: 2px; 
     }, function (tokens, status) {
       var waiting = refreshWaiters;
       refreshWaiters = null;
-      if (tokens) storeSpotifyTokens(tokens);
+      if (tokens && state.spotify) storeSpotifyTokens(tokens);
       else if (status === 400 || status === 401) spotifyLogout('Вход в Spotify устарел. Войдите снова.');
       for (var i = 0; i < waiting.length; i++) waiting[i](tokens ? tokens.access_token : null);
     });
@@ -1349,10 +1461,13 @@ button:focus, input:focus { outline: 2px solid var(--sun); outline-offset: 2px; 
     $('spSetStatus').textContent = !SPOTIFY_CLIENT_ID
       ? 'Не настроен: в файл панели нужно добавить Client ID.'
       : connected ? 'Подключён.' : 'Не подключён.';
-    $('spSetLogin').hidden = connected || !SPOTIFY_CLIENT_ID;
+    $('spSetLogin').hidden = connected || !SPOTIFY_CLIENT_ID || IS_ICON;
+    $('spPairIn').hidden = connected || !SPOTIFY_CLIENT_ID || !IS_ICON;
+    $('spPairOut').hidden = !connected || IS_ICON;
     $('spLogout').hidden = !connected;
-    $('spRedirectRow').hidden = connected;
+    $('spRedirectRow').hidden = !!SPOTIFY_CLIENT_ID;
     $('spRedirect').textContent = redirectUri();
+    $('spSafariLink').href = redirectUri();
   }
 
   function nextPollDelay() {
@@ -1468,8 +1583,18 @@ button:focus, input:focus { outline: 2px solid var(--sun); outline-offset: 2px; 
   }
   function closeDevices() { $('devices').hidden = true; }
 
-  $('spLogin').addEventListener('click', spotifyLogin);
+  $('spLogin').addEventListener('click', function () {
+    if (IS_ICON) {
+      openSettings();
+      $('spPairIn').scrollIntoView();
+    } else {
+      spotifyLogin();
+    }
+  });
   $('spSetLogin').addEventListener('click', spotifyLogin);
+  $('spHandoff').addEventListener('click', handOffLogin);
+  $('spCopyCode').addEventListener('click', copyLoginCode);
+  $('spPairForm').addEventListener('submit', connectWithCode);
   $('spLogout').addEventListener('click', function () { spotifyLogout(); });
   $('spPlay').addEventListener('click', togglePlay);
   $('spPrev').addEventListener('click', function () { spotifyCommand('POST', '/me/player/previous'); });
