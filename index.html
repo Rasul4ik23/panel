@@ -1,0 +1,1501 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Панель">
+<meta name="theme-color" content="#111820">
+<title>Домашняя панель</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;500&family=PT+Sans:wght@400;700&display=swap">
+<style>
+/* Раскладка: слева часы и погода, справа лист отрывного календаря и сетка месяца; в портретной ориентации всё идёт столбиком */
+:root {
+  --ink: #111820;        /* фон: сумеречный сине-серый */
+  --panel: #18212b;      /* окно настроек */
+  --line: #253140;       /* тонкие разделители */
+  --text: #e6ebf0;
+  --muted: #8796a6;
+  --sun: #f0b54a;        /* солнце и акцент */
+  --cold: #79bfe6;       /* мороз и осадки */
+  --cloud: #c5ced8;
+  --moon: #dfe3c9;
+  --snow: #eef4fa;
+  --paper: #ece7dc;      /* лист отрывного календаря */
+  --paper-edge: #cfc8b9; /* листы под ним */
+  --print: #1d1f24;      /* типографская краска */
+  --red: #c9392c;        /* выходные на бумаге */
+  --red-soft: #e8776b;   /* выходные на тёмном фоне */
+  --scrim: rgba(8, 12, 16, .8);
+  --display: "Oswald", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  --body: "PT Sans", "Helvetica Neue", Arial, sans-serif;
+  color-scheme: dark;
+}
+[hidden] { display: none !important; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--ink);
+  color: var(--text);
+  font-family: var(--body);
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+button { cursor: pointer; }
+button:focus, input:focus { outline: 2px solid var(--sun); outline-offset: 2px; }
+
+.app {
+  box-sizing: border-box;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 3vmin 4vmin;
+  padding-top: max(3vmin, env(safe-area-inset-top, 0px));
+  padding-bottom: max(3vmin, env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, 4vmin, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, 4vmin, env(safe-area-inset-right, 0px));
+  -webkit-user-select: none;
+  user-select: none;
+  transition: opacity 1.5s;
+}
+.night .app { opacity: .32; }
+
+.panel { flex: 1 1 auto; display: flex; }
+.main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.side {
+  flex: 0 0 36%;
+  min-width: 0;
+  margin-left: 4vmin;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Часы */
+.clock {
+  font-family: var(--display);
+  font-weight: 300;
+  font-size: 25vmin;
+  line-height: .9;
+  white-space: nowrap;
+  margin-left: -.03em;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-feature-settings: "tnum";
+  font-feature-settings: "tnum";
+}
+.clock-s { font-size: .24em; color: var(--muted); margin-left: .12em; }
+
+/* Погода сейчас */
+.ic svg { display: block; width: 100%; height: 100%; }
+.ic .sun { fill: none; stroke: var(--sun); stroke-width: 3.5; stroke-linecap: round; }
+.ic .sun-core, .ic .bolt { fill: var(--sun); }
+.ic .cloud { fill: var(--cloud); }
+.ic .moon { fill: var(--moon); }
+.ic .cut { fill: var(--ink); }
+.ic .drops { fill: none; stroke: var(--cold); stroke-width: 3.5; stroke-linecap: round; }
+.ic .flakes { fill: var(--snow); }
+.ic .fog { fill: none; stroke: var(--cloud); stroke-width: 4; stroke-linecap: round; }
+
+.now { display: flex; align-items: center; }
+.now-icon { flex: 0 0 auto; width: 15vmin; height: 15vmin; margin-right: 2.6vmin; }
+.now-temp {
+  flex: 0 0 auto;
+  font-family: var(--display);
+  font-weight: 300;
+  font-size: 15vmin;
+  line-height: .9;
+  white-space: nowrap;
+  margin-right: 3vmin;
+}
+.now-temp.cold { color: var(--cold); }
+.now-desc { min-width: 0; font-size: 3.4vmin; font-weight: 700; line-height: 1.2; }
+.now-meta { margin-top: 1.6vmin; color: var(--muted); font-size: 2.3vmin; line-height: 1.6; }
+.now-meta span { white-space: nowrap; margin-right: 2.4vmin; }
+
+/* Прогноз */
+.fc-list {
+  list-style: none;
+  margin: 2.6vmin 0 0;
+  padding: 0;
+  display: flex;
+  border-top: 1px solid var(--line);
+}
+.fc { flex: 1 1 0%; min-width: 0; text-align: center; padding-top: 2vmin; }
+.fc + .fc { border-left: 1px solid var(--line); }
+.fc-d { font-size: 2.1vmin; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+.fc.we .fc-d { color: var(--red-soft); }
+.fc-i { width: 8vmin; height: 8vmin; margin: 1vmin auto; }
+.fc-t { font-family: var(--display); font-size: 3.3vmin; white-space: nowrap; }
+.fc-t span { color: var(--muted); }
+.fc-p { margin-top: .4vmin; font-size: 1.9vmin; color: var(--cold); white-space: nowrap; }
+
+.foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 2.4vmin;
+  font-size: 14px;
+  color: var(--muted);
+}
+.foot #status { min-width: 0; margin-right: 12px; }
+.foot .warn { color: var(--sun); }
+.btn-ghost {
+  flex: 0 0 auto;
+  font: inherit;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 7px 16px;
+}
+
+/* Лист отрывного календаря */
+.sheet {
+  position: relative;
+  background: var(--paper);
+  color: var(--print);
+  border-radius: 4px;
+  padding: 3.6vmin 2.6vmin 2.2vmin;
+  text-align: center;
+  box-shadow: 0 5px 0 -2px var(--paper-edge), 0 10px 0 -5px var(--paper-edge);
+}
+.sheet:before {
+  content: "";
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: 1.2vmin;
+  height: 1.2vmin;
+  background-image: radial-gradient(circle, var(--ink) 42%, transparent 48%);
+  background-size: 2.6vmin 1.2vmin;
+  background-repeat: repeat-x;
+  background-position: center;
+}
+.sheet-month { font-size: 2.3vmin; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
+.sheet-day { font-family: var(--display); font-weight: 500; font-size: 16vmin; line-height: 1; margin-top: .4vmin; }
+.sheet-wd { font-size: 3.2vmin; font-weight: 700; }
+.sheet.we .sheet-day, .sheet.we .sheet-wd { color: var(--red); }
+.sheet-sun {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 2vmin;
+  padding-top: 1.4vmin;
+  border-top: 1px solid var(--paper-edge);
+}
+.sheet-sun div { flex: 1 1 0%; min-width: 0; }
+.sheet-sun small { display: block; font-size: 1.6vmin; text-transform: uppercase; letter-spacing: .06em; }
+.sheet-sun b { display: block; font-family: var(--display); font-weight: 500; font-size: 3vmin; margin-top: .3vmin; }
+
+/* Сетка месяца */
+.cal-wrap { margin-top: 3.4vmin; }
+.cal { width: 100%; border-collapse: collapse; table-layout: fixed; font-variant-numeric: tabular-nums; }
+.cal th { padding-bottom: 1vmin; font-size: 1.8vmin; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.cal td { height: 5.2vmin; padding: 0; text-align: center; font-size: 2.6vmin; }
+.cal .we { color: var(--red-soft); }
+.cal .past { opacity: .38; }
+.cal td span { display: inline-block; width: 4.6vmin; line-height: 4.6vmin; border-radius: 50%; }
+.cal .today span { background: var(--sun); color: var(--ink); font-weight: 700; }
+
+/* Плеер Spotify */
+.player {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  margin-top: 2.4vmin;
+  padding: 12px 16px;
+  background: var(--panel);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.sp-progress { position: absolute; left: 0; right: 0; top: 0; height: 3px; background: var(--line); }
+.sp-progress div { width: 0; height: 100%; background: var(--sun); }
+.sp-art { flex: 0 0 auto; width: 68px; height: 68px; margin-right: 14px; border-radius: 4px; background: var(--line); }
+.sp-art img { display: block; width: 100%; height: 100%; border-radius: 4px; }
+.sp-text { flex: 1 1 auto; min-width: 0; margin-right: 14px; }
+.sp-title { font-size: 2.8vmin; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sp-artist { margin-top: .4vmin; font-size: 2.2vmin; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sp-artist.warn { font-size: 14px; line-height: 1.25; color: var(--sun); white-space: normal; }
+.sp-controls { flex: 0 0 auto; display: flex; align-items: center; margin-right: 18px; }
+.sp-btn {
+  flex: 0 0 auto;
+  width: 56px;
+  height: 56px;
+  padding: 14px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text);
+}
+.sp-btn svg { display: block; width: 100%; height: 100%; fill: currentColor; }
+.sp-btn:disabled { opacity: .35; }
+.sp-play { width: 68px; height: 68px; margin: 0 4px; padding: 18px; background: var(--sun); color: var(--ink); }
+.sp-right { flex: 0 0 27%; min-width: 0; }
+.sp-vol { display: flex; align-items: center; }
+.sp-step {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 22px;
+  line-height: 1;
+}
+.sp-vol input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 44px;
+  margin: 0 8px;
+  background: transparent;
+  -webkit-appearance: none;
+}
+.sp-vol input::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: var(--muted); }
+.sp-vol input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 26px;
+  height: 26px;
+  margin-top: -11px;
+  border-radius: 50%;
+  background: var(--sun);
+}
+.sp-device {
+  display: block;
+  width: 100%;
+  margin-top: 2px;
+  padding: 5px 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  text-align: center;
+}
+.sp-device span + span { color: var(--muted); }
+
+/* Настройки */
+.overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 5;
+  background: var(--scrim);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 6vh 16px;
+}
+.dialog {
+  max-width: 520px;
+  margin: 0 auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 24px;
+}
+.dialog h2 { margin: 0 0 6px; font-family: var(--display); font-weight: 500; font-size: 28px; letter-spacing: .02em; }
+.dialog .current { margin: 0 0 18px; color: var(--muted); font-size: 15px; }
+.dialog .field { display: block; margin: 0 0 8px; font-weight: 700; font-size: 17px; }
+.dialog .section { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); }
+.dialog .section .hint { margin: 0 0 12px; }
+.dialog code { color: var(--text); font-size: 14px; word-break: break-all; -webkit-user-select: text; user-select: text; }
+.row { display: flex; }
+.row input {
+  flex: 1 1 auto;
+  min-width: 0;
+  font: inherit;
+  font-size: 17px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--ink);
+  color: var(--text);
+  -webkit-appearance: none;
+}
+.btn {
+  font: inherit;
+  font-size: 17px;
+  font-weight: 700;
+  padding: 10px 18px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--sun);
+  color: var(--ink);
+}
+.row .btn { margin-left: 8px; }
+.results { list-style: none; margin: 8px 0 0; padding: 0; }
+.results button {
+  display: block;
+  width: 100%;
+  padding: 12px 4px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 17px;
+  text-align: left;
+}
+.results small { display: block; color: var(--muted); font-size: 14px; }
+.results button:disabled { opacity: .5; }
+.results .active small { color: var(--sun); }
+.btn.quiet { background: transparent; border: 1px solid var(--line); color: var(--text); font-weight: 400; }
+.check { display: flex; align-items: center; margin-top: 16px; font-size: 17px; }
+.check input { flex: 0 0 auto; width: 22px; height: 22px; margin: 0 12px 0 0; }
+.hint { color: var(--muted); font-size: 15px; line-height: 1.45; }
+.btn.done { display: block; width: 100%; margin-top: 20px; }
+
+/* Альбомная ориентация на планшете: всё помещается на один экран */
+@media (orientation: landscape) and (min-height: 560px) {
+  .app { height: 100%; }
+}
+
+/* Портретная ориентация: часы и погода сверху, лист и месяц рядом под ними, плеер внизу */
+@media (orientation: portrait) {
+  .panel { flex-direction: column; }
+  .clock { font-size: 20vmin; }
+  .now-icon { width: 11vmin; height: 11vmin; }
+  .now-temp { font-size: 11vmin; }
+  .fc-i { width: 5.5vmin; height: 5.5vmin; }
+  .side { flex: 0 0 auto; flex-direction: row; align-items: flex-start; margin: 4vmin 0 0; }
+  .sheet { flex: 0 0 44%; }
+  .sheet-day { font-size: 11vmin; }
+  .cal-wrap { flex: 1 1 auto; min-width: 0; margin: 0 0 0 5vmin; }
+  .sp-right { flex-basis: 30%; }
+  .sp-controls { margin-right: 10px; }
+}
+
+/* Телефон */
+@media (max-width: 600px) {
+  .side { flex-direction: column; align-items: stretch; }
+  .sheet { flex: 0 0 auto; }
+  .cal-wrap { margin: 8vmin 0 0; }
+  .now-desc { font-size: 17px; }
+  .now-meta { font-size: 14px; }
+  .fc-d { font-size: 11px; letter-spacing: .04em; }
+  .fc-t { font-size: 15px; }
+  .fc-p { font-size: 10px; white-space: normal; }
+  .sheet-month { font-size: 13px; }
+  .sheet-wd { font-size: 17px; }
+  .sheet-sun small { font-size: 10px; }
+  .sheet-sun b { font-size: 16px; }
+  .cal th { font-size: 11px; }
+  .cal td { height: 38px; font-size: 15px; }
+  .cal td span { width: 32px; line-height: 32px; }
+  .clock { font-size: 28vmin; }
+  .now-icon { width: 15vmin; height: 15vmin; }
+  .now-temp { font-size: 15vmin; }
+  .sheet-day { font-size: 26vmin; }
+  .player { flex-wrap: wrap; margin-top: 6vmin; }
+  .sp-art { width: 56px; height: 56px; }
+  .sp-text { flex: 1 1 50%; margin-right: 0; }
+  .sp-title { font-size: 16px; }
+  .sp-artist { font-size: 14px; }
+  .sp-controls { flex: 0 0 100%; justify-content: center; margin: 10px 0 0; }
+  #spLogin { flex: 0 0 100%; margin-top: 10px; }
+  .sp-right { flex: 0 0 100%; margin-top: 8px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app { transition: none; }
+}
+</style>
+</head>
+<body>
+
+<div class="app" id="app">
+  <div class="panel">
+    <section class="main">
+      <div class="clock"><span id="clockHM">--:--</span><span class="clock-s" id="clockS"></span></div>
+
+      <div class="weather">
+        <div class="now">
+          <div class="ic now-icon" id="nowIcon"></div>
+          <div class="now-temp" id="nowTemp">—</div>
+          <div class="now-desc" id="nowDesc">Загружаю погоду…</div>
+        </div>
+        <div class="now-meta" id="nowMeta"></div>
+        <ul class="fc-list" id="forecast"></ul>
+      </div>
+
+      <div class="foot">
+        <span id="status"></span>
+        <button type="button" class="btn-ghost" id="openSettings">Настройки</button>
+      </div>
+    </section>
+
+    <aside class="side">
+      <div class="sheet" id="sheet">
+        <div class="sheet-month" id="sheetMonth"></div>
+        <div class="sheet-day" id="sheetDay"></div>
+        <div class="sheet-wd" id="sheetWd"></div>
+        <div class="sheet-sun" id="sheetSun" hidden>
+          <div><small>Восход</small><b id="sunrise"></b></div>
+          <div><small>Заход</small><b id="sunset"></b></div>
+          <div><small>Долгота дня</small><b id="dayLen"></b></div>
+        </div>
+      </div>
+      <div class="cal-wrap"><table class="cal" id="cal"></table></div>
+    </aside>
+  </div>
+
+  <section class="player" aria-label="Spotify">
+    <div class="sp-progress"><div id="spBar"></div></div>
+    <div class="sp-art" id="spArtBox" hidden><img id="spArt" alt="" hidden></div>
+    <div class="sp-text">
+      <div class="sp-title" id="spTitle">Spotify</div>
+      <div class="sp-artist" id="spArtist"></div>
+    </div>
+    <button type="button" class="btn" id="spLogin" hidden>Войти в Spotify</button>
+    <div class="sp-controls" id="spControls" hidden>
+      <button type="button" class="sp-btn" id="spPrev" aria-label="Предыдущий трек"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg></button>
+      <button type="button" class="sp-btn sp-play" id="spPlay" aria-label="Играть"><svg viewBox="0 0 24 24" aria-hidden="true"><path id="spPlayIcon" d="M7 4v16l13-8z"/></svg></button>
+      <button type="button" class="sp-btn" id="spNext" aria-label="Следующий трек"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg></button>
+    </div>
+    <div class="sp-right" id="spRight" hidden>
+      <div class="sp-vol" id="spVol">
+        <button type="button" class="sp-step" id="spVolDown" aria-label="Тише">−</button>
+        <input type="range" id="spVolume" min="0" max="100" step="1" value="50" aria-label="Громкость">
+        <button type="button" class="sp-step" id="spVolUp" aria-label="Громче">+</button>
+      </div>
+      <button type="button" class="sp-device" id="spDevice"><span id="spDeviceName"></span><span id="spDeviceNote"></span></button>
+    </div>
+  </section>
+</div>
+
+<div class="overlay" id="settings" hidden>
+  <div class="dialog" role="dialog" aria-labelledby="setTitle">
+    <h2 id="setTitle">Настройки</h2>
+    <p class="current">Погода сейчас для: <span id="cityCurrent"></span></p>
+
+    <form id="cityForm">
+      <label class="field" for="cityInput">Сменить город</label>
+      <div class="row">
+        <input id="cityInput" type="search" autocomplete="off" autocorrect="off" placeholder="Например, Казань">
+        <button type="submit" class="btn" id="citySearch">Найти</button>
+      </div>
+    </form>
+    <p class="hint" id="cityStatus"></p>
+    <ul class="results" id="cityResults"></ul>
+
+    <label class="check" for="optNight"><input type="checkbox" id="optNight">Затемнять экран с 23:00 до 7:00</label>
+    <label class="check" for="optSeconds"><input type="checkbox" id="optSeconds">Показывать секунды</label>
+
+    <p class="hint">Ночью можно коснуться экрана, и он станет ярким на 2 минуты.</p>
+    <p class="hint">Чтобы панель открывалась без адресной строки: в Safari нажмите «Поделиться» → «На экран „Домой“» и запускайте её с этого значка. Вход в Spotify нужно выполнить уже оттуда: значок и Safari хранят данные раздельно.</p>
+
+    <div class="section">
+      <p class="field">Spotify</p>
+      <p class="hint" id="spSetStatus"></p>
+      <button type="button" class="btn" id="spSetLogin" hidden>Войти в Spotify</button>
+      <button type="button" class="btn quiet" id="spLogout" hidden>Выйти из Spotify</button>
+      <p class="hint" id="spRedirectRow">Адрес возврата для кабинета разработчика Spotify: <code id="spRedirect"></code></p>
+    </div>
+
+    <button type="button" class="btn done" id="closeSettings">Готово</button>
+  </div>
+</div>
+
+<div class="overlay" id="devices" hidden>
+  <div class="dialog" role="dialog" aria-labelledby="devTitle">
+    <h2 id="devTitle">Где играть музыку</h2>
+    <p class="hint" id="devStatus"></p>
+    <ul class="results" id="devList"></ul>
+    <button type="button" class="btn quiet done" id="devRefresh">Обновить список</button>
+    <button type="button" class="btn done" id="closeDevices">Готово</button>
+  </div>
+</div>
+
+<script>
+// Код без let/const, стрелочных функций и fetch: так он работает в Safari старых iPad (iOS 9 и новее).
+(function () {
+  'use strict';
+
+  // Client ID приложения из кабинета разработчика Spotify. Он не секретный: вход защищён PKCE и списком разрешённых адресов возврата.
+  // Client Secret сюда вписывать нельзя.
+  var SPOTIFY_CLIENT_ID = 'bde912b4fe6e44b083813f155859f46d';
+
+  var MONTHS = ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь', 'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь'];
+  var MONTHS_GEN = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+  var WEEKDAYS = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'];
+  var WD_SHORT = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+  var WIND = ['С', 'СВ', 'В', 'ЮВ', 'Ю', 'ЮЗ', 'З', 'СЗ'];
+
+  var STORE_KEY = 'homePanel.v1';
+  var WEATHER_EVERY = 15 * 60 * 1000;
+  var RETRY_EVERY = 3 * 60 * 1000;
+
+  function $(id) { return document.getElementById(id); }
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+  function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+  function isoDate(d) { return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
+  // "2026-10-27T07:23" -> "07:23"
+  function hhmm(iso) { return iso.substr(11, 5); }
+  function minutesOf(iso) { return parseInt(iso.substr(11, 2), 10) * 60 + parseInt(iso.substr(14, 2), 10); }
+  function fmtT(t) {
+    var r = Math.round(t);
+    if (r === 0) return '0°';
+    return (r > 0 ? '+' : '−') + Math.abs(r) + '°';
+  }
+  function windText(speed, deg) {
+    if (speed < 0.5) return 'Штиль';
+    return 'Ветер ' + WIND[Math.round(deg / 45) % 8] + ' ' + Math.round(speed) + ' м/с';
+  }
+
+  // ---------- Сохранённые настройки ----------
+
+  function load() {
+    try {
+      var raw = localStorage.getItem(STORE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+  function save() {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {}
+  }
+
+  var saved = load() || {};
+  var state = {
+    city: saved.city || { name: 'Москва', region: 'Москва, Россия', lat: 55.7558, lon: 37.6173 },
+    nightDim: typeof saved.nightDim === 'boolean' ? saved.nightDim : true,
+    seconds: typeof saved.seconds === 'boolean' ? saved.seconds : false,
+    weather: saved.weather || null,
+    spotify: saved.spotify || null
+  };
+
+  function cityKey(c) { return Number(c.lat).toFixed(2) + ',' + Number(c.lon).toFixed(2); }
+
+  // ---------- Сеть ----------
+
+  // cb(status, data, xhr): status 0 — нет связи или таймаут; data — разобранный JSON или null
+  function request(method, url, headers, body, cb) {
+    var x = new XMLHttpRequest();
+    var done = false;
+    function finish(status) {
+      if (done) return;
+      done = true;
+      var data = null;
+      if (status) {
+        try { data = JSON.parse(x.responseText); } catch (e) {}
+      }
+      cb(status, data, x);
+    }
+    x.open(method, url, true);
+    x.timeout = 20000;
+    for (var name in headers) x.setRequestHeader(name, headers[name]);
+    x.ontimeout = function () { finish(0); };
+    x.onerror = function () { finish(0); };
+    x.onload = function () { finish(x.status); };
+    x.send(body || null);
+  }
+
+  function getJSON(url, ok, fail) {
+    request('GET', url, {}, null, function (status, data) {
+      if (status >= 200 && status < 300 && data) ok(data);
+      else fail();
+    });
+  }
+
+  // ---------- Иконки погоды ----------
+
+  var CLOUD = 'M18 48h28a11 11 0 0 0 1-22 15 15 0 0 0-29 2 10 10 0 0 0 0 20z';
+  var RAYS = 'M49 32h6M44 44l4.3 4.3M32 49v6M20 44l-4.3 4.3M15 32H9M20 20l-4.3-4.3M32 15V9M44 20l4.3-4.3';
+  var RAYS_SMALL = 'M36 22h4M24 34v4M15.5 30.5l-2.8 2.8M12 22H8M15.5 13.5l-2.8-2.8M24 10V6M32.5 13.5l2.8-2.8';
+
+  function icon(kind, night) {
+    var s;
+    var lifted = '<path class="cloud" transform="translate(0 -8)" d="' + CLOUD + '"/>';
+    if (kind === 'clear') {
+      s = night
+        ? '<circle class="moon" cx="30" cy="32" r="15"/><circle class="cut" cx="39" cy="25" r="12"/>'
+        : '<circle class="sun-core" cx="32" cy="32" r="11"/><path class="sun" d="' + RAYS + '"/>';
+    } else if (kind === 'partly') {
+      s = (night
+        ? '<circle class="moon" cx="24" cy="22" r="10"/><circle class="cut" cx="30" cy="17" r="8"/>'
+        : '<circle class="sun-core" cx="24" cy="22" r="8"/><path class="sun" d="' + RAYS_SMALL + '"/>') +
+        '<path class="cloud" transform="translate(8 6) scale(.9)" d="' + CLOUD + '"/>';
+    } else if (kind === 'fog') {
+      s = '<path class="fog" d="M12 24h40M8 33h48M14 42h36M10 51h40"/>';
+    } else if (kind === 'rain') {
+      s = lifted + '<path class="drops" d="M24 46l-3 9M33 46l-3 9M42 46l-3 9"/>';
+    } else if (kind === 'snow') {
+      s = lifted + '<g class="flakes"><circle cx="22" cy="48" r="2.6"/><circle cx="33" cy="51" r="2.6"/><circle cx="44" cy="48" r="2.6"/>' +
+        '<circle cx="27" cy="58" r="2.6"/><circle cx="39" cy="58" r="2.6"/></g>';
+    } else if (kind === 'sleet') {
+      s = lifted + '<path class="drops" d="M24 46l-3 9M42 46l-3 9"/><g class="flakes"><circle cx="33" cy="50" r="2.6"/><circle cx="31" cy="59" r="2.6"/></g>';
+    } else if (kind === 'storm') {
+      s = lifted + '<path class="bolt" d="M34 37l-8 12h6l-4 11 12-15h-6l4-8z"/>';
+    } else {
+      s = '<path class="cloud" d="' + CLOUD + '"/>';
+    }
+    return '<svg viewBox="0 0 64 64" aria-hidden="true">' + s + '</svg>';
+  }
+
+  // Коды погоды ВМО -> [описание, иконка]
+  function wmo(code) {
+    if (code === 0) return ['Ясно', 'clear'];
+    if (code === 1) return ['Малооблачно', 'partly'];
+    if (code === 2) return ['Переменная облачность', 'partly'];
+    if (code === 3) return ['Пасмурно', 'cloud'];
+    if (code === 45 || code === 48) return ['Туман', 'fog'];
+    if (code >= 51 && code <= 55) return ['Морось', 'rain'];
+    if (code === 56 || code === 57) return ['Ледяная морось', 'sleet'];
+    if (code === 61) return ['Небольшой дождь', 'rain'];
+    if (code === 63) return ['Дождь', 'rain'];
+    if (code === 65) return ['Сильный дождь', 'rain'];
+    if (code === 66 || code === 67) return ['Ледяной дождь', 'sleet'];
+    if (code === 71) return ['Небольшой снег', 'snow'];
+    if (code === 73) return ['Снег', 'snow'];
+    if (code === 75) return ['Сильный снег', 'snow'];
+    if (code === 77) return ['Снежная крупа', 'snow'];
+    if (code === 80) return ['Небольшой ливень', 'rain'];
+    if (code === 81) return ['Ливень', 'rain'];
+    if (code === 82) return ['Сильный ливень', 'rain'];
+    if (code === 85) return ['Снегопад', 'snow'];
+    if (code === 86) return ['Сильный снегопад', 'snow'];
+    if (code === 95) return ['Гроза', 'storm'];
+    if (code === 96 || code === 99) return ['Гроза с градом', 'storm'];
+    return ['Облачно', 'cloud'];
+  }
+
+  // ---------- Погода ----------
+
+  var weatherFailed = false;
+  var weatherTimer = null;
+
+  function schedule(ms) {
+    clearTimeout(weatherTimer);
+    weatherTimer = setTimeout(fetchWeather, ms);
+  }
+
+  function fetchWeather() {
+    var c = state.city;
+    var key = cityKey(c);
+    var url = 'https://api.open-meteo.com/v1/forecast?latitude=' + c.lat + '&longitude=' + c.lon +
+      '&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m,wind_direction_10m,surface_pressure,is_day' +
+      '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset' +
+      '&timezone=auto&forecast_days=6&wind_speed_unit=ms';
+    getJSON(url, function (data) {
+      if (cityKey(state.city) !== key) return;
+      if (!data || !data.current || !data.daily || !data.daily.time) { onFail(); return; }
+      weatherFailed = false;
+      state.weather = { key: key, fetchedAt: new Date().getTime(), data: data };
+      save();
+      renderWeather();
+      schedule(WEATHER_EVERY);
+    }, onFail);
+
+    function onFail() {
+      if (cityKey(state.city) !== key) return;
+      weatherFailed = true;
+      renderWeather();
+      schedule(RETRY_EVERY);
+    }
+  }
+
+  function todayIndex(daily) {
+    var key = isoDate(new Date());
+    for (var i = 0; i < daily.time.length; i++) {
+      if (daily.time[i] === key) return i;
+    }
+    return -1;
+  }
+
+  function renderWeather() {
+    var w = state.weather;
+    var has = w && w.data && w.key === cityKey(state.city);
+    var temp = $('nowTemp');
+
+    if (!has) {
+      $('nowIcon').innerHTML = '';
+      temp.textContent = '—';
+      temp.className = 'now-temp';
+      $('nowDesc').textContent = weatherFailed ? 'Погода не загрузилась' : 'Загружаю погоду…';
+      $('nowMeta').textContent = weatherFailed ? 'Проверьте, что iPad подключён к интернету. Попробую снова через 3 минуты.' : '';
+      $('forecast').innerHTML = '';
+      $('sheetSun').hidden = true;
+      renderStatus();
+      return;
+    }
+
+    var c = w.data.current;
+    var d = w.data.daily;
+    var now = wmo(c.weather_code);
+    $('nowIcon').innerHTML = icon(now[1], c.is_day === 0);
+    temp.textContent = fmtT(c.temperature_2m);
+    temp.className = 'now-temp' + (Math.round(c.temperature_2m) < 0 ? ' cold' : '');
+    $('nowDesc').textContent = now[0];
+    $('nowMeta').innerHTML =
+      '<span>Ощущается как ' + fmtT(c.apparent_temperature) + '</span> ' +
+      '<span>' + windText(c.wind_speed_10m, c.wind_direction_10m) + '</span> ' +
+      '<span>Влажность ' + Math.round(c.relative_humidity_2m) + '%</span> ' +
+      '<span>' + Math.round(c.surface_pressure * 0.750062) + ' мм рт. ст.</span>';
+
+    var start = todayIndex(d);
+    var html = '';
+    if (start >= 0) {
+      for (var i = start; i < d.time.length && i < start + 5; i++) {
+        var p = d.time[i].split('-');
+        var date = new Date(+p[0], +p[1] - 1, +p[2]);
+        var wd = date.getDay();
+        var label = i === start ? 'Сегодня' : i === start + 1 ? 'Завтра' : WD_SHORT[wd];
+        var day = wmo(d.weather_code[i]);
+        var rain = d.precipitation_probability_max ? d.precipitation_probability_max[i] : null;
+        var rainText = rain === null || rain === undefined ? '&nbsp;' : rain < 10 ? 'без осадков' : 'осадки ' + rain + '%';
+        html += '<li class="fc' + (wd === 0 || wd === 6 ? ' we' : '') + '">' +
+          '<div class="fc-d">' + label + '</div>' +
+          '<div class="ic fc-i" title="' + day[0] + '">' + icon(day[1], false) + '</div>' +
+          '<div class="fc-t"><b>' + fmtT(d.temperature_2m_max[i]) + '</b> <span>' + fmtT(d.temperature_2m_min[i]) + '</span></div>' +
+          '<div class="fc-p">' + rainText + '</div>' +
+          '</li>';
+      }
+    }
+    $('forecast').innerHTML = html;
+
+    if (start >= 0 && d.sunrise && d.sunset && d.sunrise[start] && d.sunset[start]) {
+      var len = minutesOf(d.sunset[start]) - minutesOf(d.sunrise[start]);
+      $('sunrise').textContent = hhmm(d.sunrise[start]);
+      $('sunset').textContent = hhmm(d.sunset[start]);
+      $('dayLen').textContent = Math.floor(len / 60) + ':' + pad2(len % 60);
+      $('sheetSun').hidden = false;
+    } else {
+      $('sheetSun').hidden = true;
+    }
+    renderStatus();
+  }
+
+  function renderStatus() {
+    var w = state.weather;
+    var text = state.city.name;
+    if (w && w.key === cityKey(state.city)) {
+      var t = new Date(w.fetchedAt);
+      var when = pad2(t.getHours()) + ':' + pad2(t.getMinutes());
+      text += isoDate(t) === isoDate(new Date())
+        ? ' · обновлено в ' + when
+        : ' · обновлено ' + t.getDate() + ' ' + MONTHS_GEN[t.getMonth()] + ' в ' + when;
+      if (weatherFailed) text += ' · нет связи, повторю через 3 мин';
+    }
+    var el = $('status');
+    el.textContent = text;
+    el.className = weatherFailed ? 'warn' : '';
+  }
+
+  // ---------- Дата и календарь ----------
+
+  function renderDate(now) {
+    var wd = now.getDay();
+    $('sheetMonth').textContent = cap(MONTHS[now.getMonth()]) + ' ' + now.getFullYear();
+    $('sheetDay').textContent = now.getDate();
+    $('sheetWd').textContent = WEEKDAYS[wd];
+    $('sheet').className = 'sheet' + (wd === 0 || wd === 6 ? ' we' : '');
+    renderCalendar(now);
+  }
+
+  function renderCalendar(now) {
+    var y = now.getFullYear();
+    var m = now.getMonth();
+    var today = now.getDate();
+    var offset = (new Date(y, m, 1).getDay() + 6) % 7; // неделя с понедельника
+    var days = new Date(y, m + 1, 0).getDate();
+    var heads = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+    var html = '<thead><tr>';
+    for (var h = 0; h < 7; h++) html += '<th' + (h > 4 ? ' class="we"' : '') + '>' + heads[h] + '</th>';
+    html += '</tr></thead><tbody>';
+    // всегда 6 строк, чтобы высота сетки не прыгала от месяца к месяцу
+    var d = 1 - offset;
+    for (var row = 0; row < 6; row++) {
+      html += '<tr>';
+      for (var col = 0; col < 7; col++, d++) {
+        if (d < 1 || d > days) { html += '<td></td>'; continue; }
+        var cls = [];
+        if (col > 4) cls.push('we');
+        if (d < today) cls.push('past');
+        if (d === today) cls.push('today');
+        html += '<td' + (cls.length ? ' class="' + cls.join(' ') + '"' : '') + '><span>' + d + '</span></td>';
+      }
+      html += '</tr>';
+    }
+    $('cal').innerHTML = html + '</tbody>';
+  }
+
+  // ---------- Часы и ночной режим ----------
+
+  var startedAt = new Date().getTime();
+  var lastDay = '';
+  var isNight = false;
+  var wakeUntil = 0;
+
+  function updateNight(now) {
+    var h = now.getHours();
+    var night = state.nightDim && (h >= 23 || h < 7) && now.getTime() > wakeUntil;
+    if (night === isNight) return;
+    isNight = night;
+    if (night) document.body.classList.add('night');
+    else document.body.classList.remove('night');
+  }
+
+  function tick() {
+    var now = new Date();
+    // раз в сутки, в 4 утра, перезагружаем страницу: старый Safari за много дней работы копит память
+    if (now.getHours() === 4 && now.getMinutes() === 0 && now.getTime() - startedAt > 3600000) {
+      location.reload();
+      return;
+    }
+    $('clockHM').textContent = pad2(now.getHours()) + ':' + pad2(now.getMinutes());
+    $('clockS').textContent = state.seconds ? ':' + pad2(now.getSeconds()) : '';
+    var day = isoDate(now);
+    if (day !== lastDay) {
+      lastDay = day;
+      renderDate(now);
+      renderWeather();
+    }
+    updateNight(now);
+    if (sp.playback) renderProgress();
+    setTimeout(tick, 1000 - now.getMilliseconds() + 10);
+  }
+
+  function wake() {
+    if (!isNight) return;
+    wakeUntil = new Date().getTime() + 2 * 60 * 1000;
+    updateNight(new Date());
+    schedulePoll(0);
+  }
+  document.addEventListener('touchstart', wake, false);
+  document.addEventListener('mousedown', wake, false);
+
+  // Не даём экрану гаснуть там, где браузер это умеет. На старых iPad: Настройки → Экран и яркость → Автоблокировка → Никогда.
+  function keepAwake() {
+    if (!navigator.wakeLock || document.hidden) return;
+    try {
+      navigator.wakeLock.request('screen').then(function () {}, function () {});
+    } catch (e) {}
+  }
+
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) return;
+    keepAwake();
+    var w = state.weather;
+    if (!w || new Date().getTime() - w.fetchedAt > WEATHER_EVERY) fetchWeather();
+    schedulePoll(0);
+  });
+
+  // ---------- Настройки ----------
+
+  var overlay = $('settings');
+
+  function showCurrentCity() {
+    var c = state.city;
+    $('cityCurrent').textContent = c.name + (c.region ? ' (' + c.region + ')' : '');
+  }
+
+  function openSettings() {
+    $('optNight').checked = state.nightDim;
+    $('optSeconds').checked = state.seconds;
+    $('cityInput').value = '';
+    $('cityResults').innerHTML = '';
+    $('cityStatus').textContent = '';
+    showCurrentCity();
+    renderSpotifySettings();
+    overlay.hidden = false;
+  }
+  function closeSettings() { overlay.hidden = true; }
+
+  $('openSettings').addEventListener('click', openSettings);
+  $('closeSettings').addEventListener('click', closeSettings);
+  overlay.addEventListener('click', function (e) { if (e.target === overlay) closeSettings(); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape' && e.keyCode !== 27) return;
+    closeSettings();
+    closeDevices();
+  });
+
+  $('optNight').addEventListener('change', function () {
+    state.nightDim = this.checked;
+    save();
+    updateNight(new Date());
+  });
+  $('optSeconds').addEventListener('change', function () {
+    state.seconds = this.checked;
+    save();
+  });
+
+  function cityItem(r) {
+    var region = [r.admin1, r.country].filter(Boolean).join(', ');
+    var li = document.createElement('li');
+    var b = document.createElement('button');
+    var name = document.createElement('span');
+    var sub = document.createElement('small');
+    b.type = 'button';
+    name.textContent = r.name;
+    sub.textContent = region;
+    b.appendChild(name);
+    b.appendChild(sub);
+    b.addEventListener('click', function () {
+      state.city = { name: r.name, region: region, lat: r.latitude, lon: r.longitude };
+      state.weather = null;
+      weatherFailed = false;
+      save();
+      showCurrentCity();
+      $('cityResults').innerHTML = '';
+      $('cityStatus').textContent = 'Город сохранён, загружаю погоду.';
+      renderWeather();
+      fetchWeather();
+    });
+    li.appendChild(b);
+    return li;
+  }
+
+  $('cityForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var input = $('cityInput');
+    var q = input.value.replace(/^\s+|\s+$/g, '');
+    var list = $('cityResults');
+    var status = $('cityStatus');
+    list.innerHTML = '';
+    if (q.length < 2) {
+      status.textContent = 'Введите хотя бы две буквы названия.';
+      return;
+    }
+    input.blur();
+    status.textContent = 'Ищу…';
+    getJSON('https://geocoding-api.open-meteo.com/v1/search?count=6&language=ru&format=json&name=' + encodeURIComponent(q), function (data) {
+      var res = (data && data.results) || [];
+      if (!res.length) {
+        status.textContent = 'Такой город не нашёлся. Проверьте название, например «Санкт-Петербург».';
+        return;
+      }
+      status.textContent = 'Выберите нужный:';
+      for (var i = 0; i < res.length; i++) list.appendChild(cityItem(res[i]));
+    }, function () {
+      status.textContent = 'Поиск не удался. Проверьте интернет и нажмите «Найти» ещё раз.';
+    });
+  });
+
+  // ---------- Spotify: вход (Authorization Code с PKCE) ----------
+
+  var SPOTIFY_SCOPES = 'user-read-playback-state user-modify-playback-state';
+  var PKCE_KEY = 'homePanel.pkce';
+
+  var SHA_K = [
+    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+    0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+    0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+    0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+    0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+    0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+    0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+    0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
+  ];
+
+  function rotr(x, n) { return (x >>> n) | (x << (32 - n)); }
+
+  // SHA-256 своей реализацией: crypto.subtle появился только в iOS 11. Вход — строка ASCII, выход — массив байтов.
+  function sha256(ascii) {
+    var h = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
+    var bytes = [];
+    var i;
+    for (i = 0; i < ascii.length; i++) bytes.push(ascii.charCodeAt(i));
+    var bitLen = bytes.length * 8;
+    bytes.push(0x80);
+    while (bytes.length % 64 !== 56) bytes.push(0);
+    bytes.push(0, 0, 0, 0, (bitLen >>> 24) & 255, (bitLen >>> 16) & 255, (bitLen >>> 8) & 255, bitLen & 255);
+
+    var w = new Array(64);
+    for (var block = 0; block < bytes.length; block += 64) {
+      for (i = 0; i < 16; i++) {
+        var j = block + i * 4;
+        w[i] = (bytes[j] << 24) | (bytes[j + 1] << 16) | (bytes[j + 2] << 8) | bytes[j + 3];
+      }
+      for (i = 16; i < 64; i++) {
+        var s0 = rotr(w[i - 15], 7) ^ rotr(w[i - 15], 18) ^ (w[i - 15] >>> 3);
+        var s1 = rotr(w[i - 2], 17) ^ rotr(w[i - 2], 19) ^ (w[i - 2] >>> 10);
+        w[i] = (w[i - 16] + s0 + w[i - 7] + s1) | 0;
+      }
+      var v = h.slice();
+      for (i = 0; i < 64; i++) {
+        var big1 = rotr(v[4], 6) ^ rotr(v[4], 11) ^ rotr(v[4], 25);
+        var ch = (v[4] & v[5]) ^ (~v[4] & v[6]);
+        var t1 = (v[7] + big1 + ch + SHA_K[i] + w[i]) | 0;
+        var big0 = rotr(v[0], 2) ^ rotr(v[0], 13) ^ rotr(v[0], 22);
+        var maj = (v[0] & v[1]) ^ (v[0] & v[2]) ^ (v[1] & v[2]);
+        var t2 = (big0 + maj) | 0;
+        v = [(t1 + t2) | 0, v[0], v[1], v[2], (v[3] + t1) | 0, v[4], v[5], v[6]];
+      }
+      for (i = 0; i < 8; i++) h[i] = (h[i] + v[i]) | 0;
+    }
+
+    var out = [];
+    for (i = 0; i < 8; i++) out.push((h[i] >>> 24) & 255, (h[i] >>> 16) & 255, (h[i] >>> 8) & 255, h[i] & 255);
+    return out;
+  }
+
+  function pkceChallenge(verifier) {
+    var bytes = sha256(verifier);
+    var s = '';
+    for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+    return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  function randomString(len) {
+    var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+    var buf = new Uint8Array(len);
+    window.crypto.getRandomValues(buf);
+    var s = '';
+    for (var i = 0; i < len; i++) s += chars.charAt(buf[i] % chars.length);
+    return s;
+  }
+
+  function toQuery(params) {
+    var parts = [];
+    for (var key in params) parts.push(encodeURIComponent(key) + '=' + encodeURIComponent(params[key]));
+    return parts.join('&');
+  }
+
+  function parseQuery(search) {
+    var out = {};
+    var parts = search.replace(/^\?/, '').split('&');
+    for (var i = 0; i < parts.length; i++) {
+      var kv = parts[i].split('=');
+      try {
+        if (kv[0]) out[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1] || '');
+      } catch (e) {}
+    }
+    return out;
+  }
+
+  // Должен в точности совпадать с адресом возврата в кабинете разработчика Spotify
+  function redirectUri() {
+    return location.origin + location.pathname.replace(/index\.html$/, '');
+  }
+
+  function spotifyLogin() {
+    var verifier = randomString(64);
+    var check = randomString(16);
+    try {
+      localStorage.setItem(PKCE_KEY, JSON.stringify({ verifier: verifier, state: check }));
+    } catch (e) {
+      showSpotifyMsg('Браузер не даёт сохранить вход. Выключите в Safari режим «Частный доступ».');
+      return;
+    }
+    location.href = 'https://accounts.spotify.com/authorize?' + toQuery({
+      client_id: SPOTIFY_CLIENT_ID,
+      response_type: 'code',
+      redirect_uri: redirectUri(),
+      scope: SPOTIFY_SCOPES,
+      state: check,
+      code_challenge_method: 'S256',
+      code_challenge: pkceChallenge(verifier)
+    });
+  }
+
+  function tokenRequest(params, cb) {
+    request('POST', 'https://accounts.spotify.com/api/token',
+      { 'Content-Type': 'application/x-www-form-urlencoded' }, toQuery(params),
+      function (status, data) {
+        cb(status === 200 && data && data.access_token ? data : null, status);
+      });
+  }
+
+  function storeSpotifyTokens(t) {
+    state.spotify = {
+      accessToken: t.access_token,
+      // Spotify может выдать новый refresh-токен, и тогда старый больше не действует
+      refreshToken: t.refresh_token || (state.spotify && state.spotify.refreshToken),
+      expiresAt: new Date().getTime() + (t.expires_in || 3600) * 1000
+    };
+    save();
+  }
+
+  // Spotify присылает пользователя обратно на панель с ?code=... или ?error=...
+  function finishSpotifyLogin() {
+    var q = parseQuery(location.search);
+    if (!q.code && !q.error) return;
+    try { history.replaceState(null, '', location.pathname); } catch (e) {}
+    var pkce = null;
+    try {
+      pkce = JSON.parse(localStorage.getItem(PKCE_KEY));
+      localStorage.removeItem(PKCE_KEY);
+    } catch (e) {}
+    if (q.error) {
+      showSpotifyMsg(q.error === 'access_denied' ? 'Вход в Spotify отменён.' : 'Spotify отказал во входе: ' + q.error);
+      return;
+    }
+    if (!pkce || pkce.state !== q.state) {
+      showSpotifyMsg('Вход не удался. Нажмите «Войти в Spotify» ещё раз.');
+      return;
+    }
+    showSpotifyMsg('Завершаю вход…');
+    tokenRequest({
+      grant_type: 'authorization_code',
+      code: q.code,
+      redirect_uri: redirectUri(),
+      client_id: SPOTIFY_CLIENT_ID,
+      code_verifier: pkce.verifier
+    }, function (tokens, status) {
+      if (!tokens) {
+        showSpotifyMsg('Вход не удался (код ' + status + '). Проверьте адрес возврата в кабинете Spotify.');
+        return;
+      }
+      storeSpotifyTokens(tokens);
+      showSpotifyMsg('');
+      pollPlayer();
+    });
+  }
+
+  function spotifyLogout(message) {
+    state.spotify = null;
+    sp.playback = null;
+    clearTimeout(sp.pollTimer);
+    save();
+    renderSpotifySettings();
+    showSpotifyMsg(message || '');
+  }
+
+  // ---------- Spotify: запросы ----------
+
+  var refreshWaiters = null;
+
+  // Обновляем токен один раз, даже если его ждут сразу несколько запросов
+  function refreshSpotifyToken(cb) {
+    if (refreshWaiters) { refreshWaiters.push(cb); return; }
+    refreshWaiters = [cb];
+    tokenRequest({
+      grant_type: 'refresh_token',
+      refresh_token: state.spotify.refreshToken,
+      client_id: SPOTIFY_CLIENT_ID
+    }, function (tokens, status) {
+      var waiting = refreshWaiters;
+      refreshWaiters = null;
+      if (tokens) storeSpotifyTokens(tokens);
+      else if (status === 400 || status === 401) spotifyLogout('Вход в Spotify устарел. Войдите снова.');
+      for (var i = 0; i < waiting.length; i++) waiting[i](tokens ? tokens.access_token : null);
+    });
+  }
+
+  function withSpotifyToken(cb) {
+    var s = state.spotify;
+    if (!s) { cb(null); return; }
+    if (s.expiresAt - 60000 > new Date().getTime()) { cb(s.accessToken); return; }
+    refreshSpotifyToken(cb);
+  }
+
+  function spotifyApi(method, path, body, cb, retried) {
+    withSpotifyToken(function (token) {
+      if (!token) { cb(0, null); return; }
+      var headers = { Authorization: 'Bearer ' + token };
+      var payload = null;
+      if (body) {
+        headers['Content-Type'] = 'application/json';
+        payload = JSON.stringify(body);
+      }
+      request(method, 'https://api.spotify.com/v1' + path, headers, payload, function (status, data, x) {
+        if (status === 401 && !retried && state.spotify) {
+          state.spotify.expiresAt = 0;
+          spotifyApi(method, path, body, cb, true);
+          return;
+        }
+        if (status === 429) {
+          var wait = parseInt(x.getResponseHeader('Retry-After'), 10) || 30;
+          sp.backoffUntil = new Date().getTime() + wait * 1000;
+        }
+        cb(status, data);
+      });
+    });
+  }
+
+  function spotifyErrorText(status, data) {
+    var err = data && data.error;
+    var reason = err && err.reason;
+    if (status === 0) return 'Нет связи со Spotify. Проверьте интернет.';
+    if (reason === 'PREMIUM_REQUIRED') return 'Для управления нужен Spotify Premium.';
+    if (reason === 'VOLUME_CONTROL_DISALLOW') return 'Это устройство не даёт менять громкость удалённо.';
+    if (status === 404 || reason === 'NO_ACTIVE_DEVICE') return 'Нет активного устройства. Откройте на нём Spotify.';
+    if (status === 429) return 'Spotify просит подождать: слишком много запросов.';
+    if (status === 403) return 'Spotify отклонил команду' + (err && err.message ? ': ' + err.message : '.');
+    return 'Команда не прошла (код ' + status + ').';
+  }
+
+  // ---------- Spotify: плеер ----------
+
+  var PLAY_ICON = 'M7 4v16l13-8z';
+  var PAUSE_ICON = 'M6 4h4v16H6zM14 4h4v16h-4z';
+  var DEVICE_TYPES = {
+    Computer: 'Компьютер',
+    Smartphone: 'Телефон',
+    Tablet: 'Планшет',
+    Speaker: 'Колонка',
+    TV: 'Телевизор',
+    AVR: 'Ресивер',
+    STB: 'ТВ-приставка',
+    AudioDongle: 'Аудиоадаптер',
+    GameConsole: 'Игровая приставка',
+    CastVideo: 'Chromecast',
+    CastAudio: 'Chromecast Audio',
+    Automobile: 'Автомобиль'
+  };
+
+  var sp = {
+    playback: null,      // ответ GET /me/player; null, если ничего не играет
+    receivedAt: 0,       // когда получен progress_ms
+    pollTimer: null,
+    backoffUntil: 0,     // до этого времени не опрашиваем: Spotify просил подождать
+    volumeTimer: null,
+    volumeHoldUntil: 0,  // пока пользователь двигает громкость, ответы опроса её не перезаписывают
+    msg: '',
+    msgTimer: null,
+    artUrl: ''
+  };
+
+  function showSpotifyMsg(text) {
+    sp.msg = text;
+    clearTimeout(sp.msgTimer);
+    if (text) sp.msgTimer = setTimeout(function () { showSpotifyMsg(''); }, 7000);
+    renderPlayer();
+  }
+
+  function pickImage(images) {
+    if (!images || !images.length) return '';
+    // картинки идут от большой к маленькой: берём самую маленькую, которая не расплывётся на экране ретина
+    var best = images[0];
+    for (var i = 1; i < images.length; i++) {
+      if (images[i].width >= 150) best = images[i];
+    }
+    return best.url;
+  }
+
+  function progressNow(p) {
+    var ms = p.progress_ms || 0;
+    if (p.is_playing) ms += new Date().getTime() - sp.receivedAt;
+    return ms;
+  }
+
+  function renderProgress() {
+    var p = sp.playback;
+    var pct = 0;
+    if (p && p.item && p.item.duration_ms) pct = Math.min(100, progressNow(p) / p.item.duration_ms * 100);
+    $('spBar').style.width = pct + '%';
+  }
+
+  function renderPlayer() {
+    var connected = !!state.spotify;
+    var p = connected ? sp.playback : null;
+    var item = p && p.item;
+    var device = p && p.device;
+    var title;
+    var sub;
+
+    if (!SPOTIFY_CLIENT_ID) {
+      title = 'Spotify не настроен';
+      sub = 'В файл панели нужно добавить Client ID.';
+    } else if (!connected) {
+      title = 'Spotify';
+      sub = 'Войдите, чтобы управлять музыкой на своих устройствах.';
+    } else if (!p) {
+      title = 'Сейчас ничего не играет';
+      sub = 'Включите Spotify на устройстве или выберите его здесь.';
+    } else if (!item) {
+      title = 'Название трека недоступно';
+      sub = 'Spotify его не сообщает, например в приватном сеансе.';
+    } else {
+      title = item.name;
+      sub = item.artists
+        ? item.artists.map(function (a) { return a.name; }).join(', ')
+        : item.show ? item.show.name : '';
+    }
+    $('spTitle').textContent = title;
+    $('spArtist').textContent = sp.msg || sub;
+    $('spArtist').className = 'sp-artist' + (sp.msg ? ' warn' : '');
+
+    var art = item ? pickImage(item.album ? item.album.images : item.images) : '';
+    if (art !== sp.artUrl) {
+      sp.artUrl = art;
+      $('spArt').hidden = !art;
+      if (art) $('spArt').src = art;
+    }
+
+    $('spLogin').hidden = connected || !SPOTIFY_CLIENT_ID;
+    $('spArtBox').hidden = !connected;
+    $('spControls').hidden = !connected;
+    $('spRight').hidden = !connected;
+
+    var playing = !!(p && p.is_playing);
+    $('spPlayIcon').setAttribute('d', playing ? PAUSE_ICON : PLAY_ICON);
+    $('spPlay').setAttribute('aria-label', playing ? 'Пауза' : 'Играть');
+    $('spPrev').disabled = !p;
+    $('spNext').disabled = !p;
+
+    var canVolume = !!(device && device.supports_volume !== false && typeof device.volume_percent === 'number');
+    $('spVol').hidden = !canVolume;
+    if (canVolume && new Date().getTime() > sp.volumeHoldUntil) $('spVolume').value = device.volume_percent;
+    $('spDeviceName').textContent = device ? device.name : 'Выбрать устройство';
+    $('spDeviceNote').textContent = !device ? '' : canVolume
+      ? ' · ' + device.volume_percent + '%'
+      : ' · громкость только на самом устройстве';
+
+    renderProgress();
+  }
+
+  function renderSpotifySettings() {
+    var connected = !!state.spotify;
+    $('spSetStatus').textContent = !SPOTIFY_CLIENT_ID
+      ? 'Не настроен: в файл панели нужно добавить Client ID.'
+      : connected ? 'Подключён.' : 'Не подключён.';
+    $('spSetLogin').hidden = connected || !SPOTIFY_CLIENT_ID;
+    $('spLogout').hidden = !connected;
+    $('spRedirectRow').hidden = connected;
+    $('spRedirect').textContent = redirectUri();
+  }
+
+  function nextPollDelay() {
+    var p = sp.playback;
+    if (isNight || !p) return 30000;
+    if (!p.is_playing) return 15000;
+    // опрашиваем сразу после конца трека, чтобы панель не показывала старое название
+    var left = p.item && p.item.duration_ms ? p.item.duration_ms - (p.progress_ms || 0) : 8000;
+    return Math.max(1000, Math.min(8000, left + 700));
+  }
+
+  function schedulePoll(ms) {
+    clearTimeout(sp.pollTimer);
+    if (!state.spotify || document.hidden) return;
+    sp.pollTimer = setTimeout(pollPlayer, Math.max(ms, sp.backoffUntil - new Date().getTime()));
+  }
+
+  function pollPlayer() {
+    spotifyApi('GET', '/me/player?additional_types=track,episode', null, function (status, data) {
+      if (!state.spotify) return;
+      if (status === 200 && data) {
+        sp.playback = data;
+        sp.receivedAt = new Date().getTime();
+      } else if (status === 204) {
+        sp.playback = null;
+      } else if (status === 403) {
+        showSpotifyMsg(spotifyErrorText(status, data));
+      }
+      renderPlayer();
+      schedulePoll(nextPollDelay());
+    });
+  }
+
+  function spotifyCommand(method, path, body) {
+    spotifyApi(method, path, body, function (status, data) {
+      if (!state.spotify) return;
+      if (status < 200 || status >= 300) {
+        if (status === 404) openDevices();
+        else showSpotifyMsg(spotifyErrorText(status, data));
+      }
+      // Spotify применяет команду не мгновенно
+      schedulePoll(1000);
+    });
+  }
+
+  function togglePlay() {
+    var p = sp.playback;
+    if (!p) { openDevices(); return; }
+    var path = p.is_playing ? '/me/player/pause' : '/me/player/play';
+    p.progress_ms = progressNow(p);
+    p.is_playing = !p.is_playing;
+    sp.receivedAt = new Date().getTime();
+    renderPlayer();
+    spotifyCommand('PUT', path);
+  }
+
+  function setVolume(value) {
+    var v = Math.max(0, Math.min(100, Math.round(value)));
+    sp.volumeHoldUntil = new Date().getTime() + 3000;
+    $('spVolume').value = v;
+    if (sp.playback && sp.playback.device) sp.playback.device.volume_percent = v;
+    renderPlayer();
+    clearTimeout(sp.volumeTimer);
+    sp.volumeTimer = setTimeout(function () {
+      spotifyCommand('PUT', '/me/player/volume?volume_percent=' + v);
+    }, 300);
+  }
+
+  function deviceItem(d) {
+    var li = document.createElement('li');
+    var b = document.createElement('button');
+    var name = document.createElement('span');
+    var sub = document.createElement('small');
+    var note = DEVICE_TYPES[d.type] || d.type || '';
+    if (d.is_active) note += ' · играет сейчас';
+    if (d.is_restricted) note += ' · Spotify не даёт им управлять';
+    if (d.is_active) li.className = 'active';
+    b.type = 'button';
+    b.disabled = !!d.is_restricted || !d.id;
+    name.textContent = d.name;
+    sub.textContent = note;
+    b.appendChild(name);
+    b.appendChild(sub);
+    b.addEventListener('click', function () {
+      closeDevices();
+      spotifyCommand('PUT', '/me/player', { device_ids: [d.id], play: true });
+    });
+    li.appendChild(b);
+    return li;
+  }
+
+  function loadDevices() {
+    var status = $('devStatus');
+    var list = $('devList');
+    status.textContent = 'Ищу устройства…';
+    list.innerHTML = '';
+    spotifyApi('GET', '/me/player/devices', null, function (code, data) {
+      if (code !== 200 || !data) {
+        status.textContent = spotifyErrorText(code, data);
+        return;
+      }
+      var found = data.devices || [];
+      status.textContent = found.length
+        ? 'Нажмите на устройство, и музыка заиграет на нём.'
+        : 'Устройств не видно. Откройте приложение Spotify на телефоне или компьютере и нажмите «Обновить список».';
+      for (var i = 0; i < found.length; i++) list.appendChild(deviceItem(found[i]));
+    });
+  }
+
+  function openDevices() {
+    $('devices').hidden = false;
+    loadDevices();
+  }
+  function closeDevices() { $('devices').hidden = true; }
+
+  $('spLogin').addEventListener('click', spotifyLogin);
+  $('spSetLogin').addEventListener('click', spotifyLogin);
+  $('spLogout').addEventListener('click', function () { spotifyLogout(); });
+  $('spPlay').addEventListener('click', togglePlay);
+  $('spPrev').addEventListener('click', function () { spotifyCommand('POST', '/me/player/previous'); });
+  $('spNext').addEventListener('click', function () { spotifyCommand('POST', '/me/player/next'); });
+  $('spVolDown').addEventListener('click', function () { setVolume(+$('spVolume').value - 5); });
+  $('spVolUp').addEventListener('click', function () { setVolume(+$('spVolume').value + 5); });
+  $('spVolume').addEventListener('input', function () { setVolume(+this.value); });
+  $('spVolume').addEventListener('change', function () { setVolume(+this.value); });
+  $('spDevice').addEventListener('click', openDevices);
+  $('devRefresh').addEventListener('click', loadDevices);
+  $('closeDevices').addEventListener('click', closeDevices);
+  $('devices').addEventListener('click', function (e) { if (e.target === $('devices')) closeDevices(); });
+
+  // ---------- Запуск ----------
+
+  tick();
+  keepAwake();
+  var w = state.weather;
+  var age = w ? new Date().getTime() - w.fetchedAt : Infinity;
+  if (w && w.key === cityKey(state.city) && age < WEATHER_EVERY) schedule(WEATHER_EVERY - age);
+  else fetchWeather();
+
+  renderPlayer();
+  finishSpotifyLogin();
+  if (state.spotify) pollPlayer();
+})();
+</script>
+</body>
+</html>
